@@ -65,38 +65,54 @@ const ProductUpload = () => {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setProduct({
-      ...product,
-      // Check if the input type is number and convert it accordingly
-      [name]: type === "number" ? (value ? parseFloat(value) : "") : value,
-    });
+    const updatedValue =
+      type === "number" ? (value ? parseFloat(value) : "") : value;
+    setProduct({ ...product, [name]: updatedValue });
+
+    // Log the updated product state
+    console.log("Updated product:", { ...product, [name]: updatedValue });
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setUploading(true);
 
-    if (!file) {
-      console.error("File is not selected.");
+    const formData = new FormData();
+    if (file) {
+      formData.append("file", file);
+    } else {
+      console.error("No file selected");
       return;
     }
 
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("name", product.name);
-    formData.append("code", product.code);
-    formData.append("price", product.price.toString());
-
     try {
-      const response = await fetch("/api/upload", {
+      const uploadResponse = await fetch("/api/s3-upload", {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
-      console.log("Product uploaded:", data);
-      setUploading(false);
+      const uploadData = await uploadResponse.json();
+      const imageUrl = uploadData.url; // URL from S3 upload
+
+      console.log("Image URL:", imageUrl); // Log the image URL
+
+      // Send the product details including the image URL to your product API
+      const productResponse = await fetch("/api/product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: product.name,
+          code: product.code,
+          price: product.price,
+          imageUrl: imageUrl,
+        }),
+      });
+      const productData = await productResponse.json();
+      console.log("Product created:", productData);
     } catch (error) {
-      console.error("Error uploading product:", error);
+      console.error("Error:", error);
+    } finally {
       setUploading(false);
     }
   };
