@@ -1,0 +1,292 @@
+stages:
+  - get_token
+  - install
+  - quality
+  - buildImage  
+  - deploy
+
+variables:
+  ECR_NAME: stc-nss-ordering-service-ecr
+  AWS_DEFAULT_REGION: ap-southeast-1
+  DOCKER_TLS_CERTDIR: ""
+  CLUSTER_NAME: mob-nss-dev-ecs
+  SERVICE_NAME: stc-nss-ordering-service-service
+  TASK_DEFINITION_NAME: stc-nss-ordering-service-dev-taskdefinition
+  CPU: 256
+  MEMORY: 512
+  EXECUTION_ROLE_ARN: arn:aws:iam::595381316185:role/mob-nss-ecs-executiontask-dev-role
+  PROJECT_ID: "51742036"
+  SECURE_FILES: "https://gitlab.com/api/v4/projects/$PROJECT_ID/secure_files/1051517/download"
+  PRIVATE_TOKEN: $CI_PRIVATE_TOKEN
+  CI_AWS_PROFILE : ''
+
+.script-build-image:
+  before_script:
+    - amazon-linux-extras install -y docker
+    - aws --version
+    - docker --version
+    - yum install jq -y -q
+    - IMAGE_TAG=$ENV-$(jq -r '.version' package.json)
+    - echo pkVersion $IMAGE_TAG
+    - echo Logging in to Amazon ECR...
+    - AccountID=$(aws sts get-caller-identity --query Account --output text)
+    - aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin ${AccountID}.dkr.ecr.ap-southeast-1.amazonaws.com
+    - REPOSITORY_IMAGE_URI=$AccountID.dkr.ecr.ap-southeast-1.amazonaws.com/$ECR_NAME
+    - echo REPOSITORY_IMAGE_URI=$REPOSITORY_IMAGE_URI:$IMAGE_TAG
+  script:
+    - aws sts get-caller-identity
+    - docker build -f Dockerfile --build-arg AccountID=$AccountID -t $REPOSITORY_IMAGE_URI:$IMAGE_TAG .
+    - docker push $REPOSITORY_IMAGE_URI:$IMAGE_TAG
+    - docker rmi -f $(docker images | grep $REPOSITORY_IMAGE_URI) || true
+    - docker rmi -f $(docker images -f "dangling=true" -q) || true
+
+.script-deploy-ecs:
+  before_script:
+    - amazon-linux-extras install -y docker
+    - aws --version
+    - docker --version
+    - yum install jq -y -q
+  script:
+    # Download Secret File (ENV)
+    - 'curl --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" "$SECURE_FILES" >> ENV.json'
+    - TASK_ENV=$(<ENV.json)
+    # IF PROD config credential
+    - |
+      #!/bin/bash
+      if [ "$ENV" == "prd" ] ; then
+        mkdir -p $HOME/.aws
+        echo "[profile cpamobnssprd]" >> $HOME/.aws/config
+        echo "role_arn = arn:aws:iam::885502103456:role/mob-nss-gitlabrunner-role" >> $HOME/.aws/config
+        echo "credential_source = Ec2InstanceMetadata" >> $HOME/.aws/config
+        echo "role_session_name=gitlab-runner" >> $HOME/.aws/config
+        echo "region = ap-southeast-1" >> $HOME/.aws/config
+      fi
+    - |
+      #!/bin/bash
+      if [ "$ENV" == "uat" ] ; then
+        mkdir -p $HOME/.aws
+        echo "[profile cpamobnssuat]" >> $HOME/.aws/config
+        echo "role_arn = arn:aws:iam::937100349321:role/stc-nss-gitlabrunner-role" >> $HOME/.aws/config
+        echo "credential_source = Ec2InstanceMetadata" >> $HOME/.aws/config
+        echo "role_session_name=gitlab-runner" >> $HOME/.aws/config
+        echo "region = ap-southeast-1" >> $HOME/.aws/config
+      fi
+    - IMAGE_TAG=$ENV-$(jq -r '.version' package.json)
+    - AccountID=$(aws sts get-caller-identity --query Account --output text)
+    - REPOSITORY_IMAGE_URI=$AccountID.dkr.ecr.ap-southeast-1.amazonaws.com/$ECR_NAME  
+    #GET DESCRIBE TASK AND UPDATE IMAGE_TAG,ENV
+    - TASK_DEFINITION=$(aws ${CI_AWS_PROFILE} ecs describe-task-definition --task-definition "$TASK_DEFINITION_NAME" --region "${AWS_DEFAULT_REGION}")
+    - NEW_CONTAINER_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$REPOSITORY_IMAGE_URI:$IMAGE_TAG" --argjson CPU "$CPU" --argjson MEMORY "$MEMORY" --argjson ENV_FILE "$TASK_ENV"  '.taskDefinition.containerDefinitions[0].image = $IMAGE | .taskDefinition.containerDefinitions[0].cpu = $CPU | .taskDefinition.containerDefinitions[0].memory = $MEMORY | .taskDefinition.containerDefinitions[0].environment = $ENV_FILE | .taskDefinition.containerDefinitions[0]')
+    - echo $NEW_CONTAINER_DEFINTIION | jq '.'
+    #GET OLD TASK ID
+    - TASK_ID=$(aws ${CI_AWS_PROFILE} ecs list-tasks --cluster ${CLUSTER_NAME} --family ${TASK_DEFINITION_NAME} | jq '.taskArns[0:100] | join(" ")' | sed  's/"//g')
+    - echo "Registering new container definition..."
+    #REGISTER NEW TASK
+    - aws ${CI_AWS_PROFILE} ecs register-task-definition --region "${AWS_DEFAULT_REGION}" --family "${TASK_DEFINITION_NAME}" --container-definitions "${NEW_CONTAINER_DEFINTIION}" --cpu ${CPU} --memory ${MEMORY} --execution-role-arn "${EXECUTION_ROLE_ARN}" --task-role-arn "${EXECUTION_ROLE_ARN}" --network-mode "awsvpc" --requires-compatibilities "FARGATE"
+    - echo "Updating the service..."
+    #UPDATE SERVICE 
+    - aws ${CI_AWS_PROFILE} ecs update-service --region "${AWS_DEFAULT_REGION}" --cluster "${CLUSTER_NAME}" --service "${SERVICE_NAME}"  --task-definition "${TASK_DEFINITION_NAME}" --force-new-deployment
+    #WAIT OLD TASK STOP
+    - echo "Waiting until the previous task ${TASK_ID} is stopped..."
+    - aws ${CI_AWS_PROFILE} ecs wait tasks-stopped --region "${AWS_DEFAULT_REGION}" --cluster "${CLUSTER_NAME}" --tasks ${TASK_ID} || true
+    - echo "The previous task ${TASK_ID} has stopped."
+    - TASK_ID=$(aws ${CI_AWS_PROFILE} ecs list-tasks --cluster ${CLUSTER_NAME} --family ${TASK_DEFINITION_NAME} | jq .taskArns[0] | sed  's/"//g' | cut -d '/' -f 3)
+    - echo "New task ${TASK_ID} is running."
+    - aws ${CI_AWS_PROFILE} ecs describe-tasks --region "${AWS_DEFAULT_REGION}" --cluster "${CLUSTER_NAME}" --tasks "${TASK_ID}"
+
+get_token:
+  stage: get_token
+  image: 
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  tags:
+    - docker-gitlab-dev
+  before_script:
+    - aws --version
+    - AccountID=$(aws sts get-caller-identity --query Account --output text)
+  script:
+    - AWS_PASSWORD=$(aws ecr get-login-password --region ap-southeast-1)
+    - AUTH=$(echo "AWS:$AWS_PASSWORD" | base64 | tr -d "\n")
+    - echo "DOCKER_AUTH_CONFIG="{\"auths\":{\"${AccountID}.dkr.ecr.ap-southeast-1.amazonaws.com\":{\"auth\":\"$AUTH\"}}}"" >> auth.env
+  artifacts:
+    reports:
+      dotenv: auth.env
+
+install:
+  stage: install
+  script:
+    - npm install
+    - npm i --save-dev
+  image:
+    name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:node14-alpine
+  except:
+    - main
+    - /^release-[0-9]+$/
+  tags:
+    - docker-gitlab-dev
+  dependencies:
+    - get_token
+  artifacts:
+    name: "artifacts"
+    untracked: true
+    expire_in: 30 mins
+    when: on_success
+    paths:
+      - node_modules/
+
+test:unit:
+  stage: quality
+  tags:
+    - docker-gitlab-dev
+  image:
+    name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:node14-alpine
+  except:
+    - main
+    - /^release-[0-9]+$/
+  script:
+    - cp .env.for-test .env
+    - npm run test:ci
+  coverage: /All files[^|]*\|[^|]*\s+([\d\.]+)/
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+
+build-dev:
+  stage: buildImage
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  dependencies:
+    - get_token
+    - test:unit
+  tags:
+    - docker-gitlab-dev
+  only:
+    refs:
+      - dev
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind
+  variables:
+    ENV: dev
+  extends: .script-build-image
+
+deploy-dev:
+  stage: deploy
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  environment:
+    name: DEV
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind
+  dependencies:
+    - get_token
+    - build-dev
+  tags: 
+    - docker-gitlab-dev
+  variables:
+    ENV: dev  
+  only:
+    - dev
+  extends: .script-deploy-ecs    
+
+build-uat:
+  when: manual
+  stage: buildImage
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  tags:
+    - docker-gitlab-dev
+  only:
+    refs:
+      - /^release-[0-9]+$/
+  dependencies:
+    - get_token
+    - test:unit
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind
+  variables:
+    ENV: uat
+  extends: .script-build-image
+
+deploy-uat:
+  needs: ["build-uat", "get_token"]
+  stage: deploy
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind    
+  tags: 
+    - docker-gitlab-dev
+  dependencies:
+    - get_token
+    - build-uat
+  variables:
+    ENV: uat  
+    EXECUTION_ROLE_ARN: arn:aws:iam::937100349321:role/stc-nss-ecs-executiontask-uat-role
+    SECURE_FILES: "https://gitlab.com/api/v4/projects/$PROJECT_ID/secure_files/xxxx/download"
+    PRIVATE_TOKEN: $CI_PRIVATE_TOKEN    
+    CI_AWS_PROFILE: "--profile cpamobnssuat"
+    CLUSTER_NAME: stc-nss-uat-ecs
+    SERVICE_NAME: stc-nss-ordering-service-service
+    TASK_DEFINITION_NAME: stc-nss-ordering-service-uat-taskdefinition
+    CPU: 1024
+    MEMORY: 2048
+  only:
+    - /^release-[0-9]+$/
+  extends: .script-deploy-ecs
+  
+build-prd:
+  when: manual
+  stage: buildImage
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  tags:
+    - docker-gitlab-dev
+  only:
+    refs:
+      - main
+  dependencies:
+    - get_token
+    - test:unit
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind
+  variables:
+    ENV: prd
+  extends: .script-build-image
+
+deploy-prd:
+  needs: ["build-prd", "get_token"]
+  stage: deploy
+  image:
+    name: amazon/aws-cli:2.7.17
+    entrypoint: [""]
+  services:
+    - name: 595381316185.dkr.ecr.ap-southeast-1.amazonaws.com/gosoft-images-registry:docker19.03.12-dind    
+  tags: 
+    - docker-gitlab-dev
+  dependencies:
+    - get_token
+    - build-prd
+  variables:
+    ENV: prd  
+    EXECUTION_ROLE_ARN: arn:aws:iam::885502103456:role/mob-nss-ecs-executiontask-prd-role
+    SECURE_FILES: "https://gitlab.com/api/v4/projects/$PROJECT_ID/secure_files/xxxx/download"
+    PRIVATE_TOKEN: $CI_PRIVATE_TOKEN    
+    CI_AWS_PROFILE: "--profile cpamobnssprd"
+    CLUSTER_NAME: mob-nss-prd-ecs
+    SERVICE_NAME: mob-nss-ordering-service-service
+    TASK_DEFINITION_NAME: mob-nss-ordering-service-prd-taskdefinition
+    CPU: 1024
+    MEMORY: 2048
+  only:
+    - main
+  extends: .script-deploy-ecs

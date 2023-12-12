@@ -21,9 +21,13 @@ async function uploadFileToS3(file: any, fileName: any) {
     ContentType: contentType,
   };
 
-  const command = new PutObjectCommand(params);
-  await s3Client.send(command);
-  return fileName;
+  await s3Client.send(new PutObjectCommand(params));
+
+  // Construct the URL of the uploaded file
+  const fileUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${
+    process.env.AWS_S3_REGION
+  }.amazonaws.com/${encodeURIComponent(fileName)}`;
+  return fileUrl;
 }
 
 export async function POST(request: any) {

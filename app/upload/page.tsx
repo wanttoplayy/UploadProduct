@@ -91,7 +91,7 @@ const ProductUpload = () => {
         body: formData,
       });
       const uploadData = await uploadResponse.json();
-      const imageUrl = uploadData.url; // URL from S3 upload
+      const imageUrl = uploadData.fileName; // Updated to use fileName from the response
 
       console.log("Image URL:", imageUrl); // Log the image URL
 
@@ -105,7 +105,7 @@ const ProductUpload = () => {
           name: product.name,
           code: product.code,
           price: product.price,
-          imageUrl: imageUrl,
+          imageUrl: imageUrl, // Send the imageUrl obtained from the s3 upload response
         }),
       });
       const productData = await productResponse.json();
