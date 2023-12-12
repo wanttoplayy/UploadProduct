@@ -3,6 +3,9 @@ import { useState, useCallback, ChangeEvent, FormEvent } from "react";
 import { useDropzone } from "react-dropzone";
 import { Poppins, Prompt } from "next/font/google";
 import Image from "next/image";
+import Link from "next/link";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
 import UploadIcon from "@/app/assets/images/uploadIcon.png";
 
@@ -31,6 +34,7 @@ type Product = {
 };
 
 const ProductUpload = () => {
+  const { toast } = useToast();
   const [product, setProduct] = useState<Product>({
     name: "",
     code: "",
@@ -82,6 +86,7 @@ const ProductUpload = () => {
       formData.append("file", file);
     } else {
       console.error("No file selected");
+      setUploading(false);
       return;
     }
 
@@ -91,27 +96,39 @@ const ProductUpload = () => {
         body: formData,
       });
       const uploadData = await uploadResponse.json();
-      const imageUrl = uploadData.fileName; // Updated to use fileName from the response
+      const imageUrl = uploadData.fileName; // Assume this is the correct property from your response
 
-      console.log("Image URL:", imageUrl); // Log the image URL
-
-      // Send the product details including the image URL to your product API
-      const productResponse = await fetch("/api/product", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: product.name,
-          code: product.code,
-          price: product.price,
-          imageUrl: imageUrl, // Send the imageUrl obtained from the s3 upload response
-        }),
-      });
-      const productData = await productResponse.json();
-      console.log("Product created:", productData);
+      if (uploadResponse.ok && imageUrl) {
+        const productResponse = await fetch("/api/product", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: product.name,
+            code: product.code,
+            price: product.price,
+            imageUrl: imageUrl,
+          }),
+        });
+        const productData = await productResponse.json();
+        if (productResponse.ok) {
+          console.log("Product created:", productData);
+          toast({
+            description: `${product.name} has been successfully created.`,
+          });
+        } else {
+          throw new Error(productData.error || "Failed to create product");
+        }
+      } else {
+        throw new Error(uploadData.error || "Failed to upload image");
+      }
     } catch (error) {
       console.error("Error:", error);
+      // toast({
+      //   description: `Error: ${error.message}`,
+      //   status: "error",
+      // });
     } finally {
       setUploading(false);
     }
@@ -119,7 +136,7 @@ const ProductUpload = () => {
 
   return (
     <main className={poppins.className}>
-      <div className="container mx-auto p-8 bg-white shadow rounded-lg">
+      <div className="container mx-auto p-8 bg-white  rounded-lg">
         <h1
           className={`${poppins600.className} text-[32px] font-bold mb-6 text-start ml-[5%]`}
         >
@@ -241,6 +258,16 @@ const ProductUpload = () => {
           </div>
 
           <div className="flex space-x-[26px]" style={prompt.style}>
+            <Link href="/">
+              <div
+                className={`mt-[50px] w-[185px] rounded-full border border-[#D9D9D9] h-[56px] flex justify-center items-center py-2 px-4 shadow-sm text-sm font-medium text-[#E13B30] bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                  uploading ? "cursor-not-allowed" : ""
+                }`}
+              >
+                {uploading ? "Uploading..." : "ยกเลิก"}
+              </div>
+            </Link>
+
             <button
               type="submit"
               disabled={uploading}
@@ -248,16 +275,7 @@ const ProductUpload = () => {
                 uploading ? "bg-gray-300" : "bg-red-500 hover:bg-red-700"
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
             >
-              {uploading ? "Uploading..." : "ยกเลิก"}
-            </button>
-            <button
-              type="submit"
-              disabled={uploading}
-              className={`mt-[50px] w-[185px] rounded-3xl h-[56px] flex  justify-center items-center py-2 px-4 border border-transparent  shadow-sm text-sm font-medium text-white ${
-                uploading ? "bg-gray-300" : "bg-red-500 hover:bg-red-700"
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
-            >
-              {uploading ? "กำลังโหลด..." : "ยืนยัน"}
+              ยืนยัน
             </button>
           </div>
         </form>
