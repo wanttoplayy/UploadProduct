@@ -54,3 +54,44 @@ export async function GET(request: Request) {
     );
   }
 }
+
+// DELETE Method
+export async function DELETE(request: Request) {
+  await dbConnect();
+  try {
+    const url = new URL(request.url);
+    const productId = url.pathname.split("/").pop();
+    await Product.findByIdAndDelete(productId);
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (error) {
+    console.error(error);
+    return new Response(
+      JSON.stringify({ success: false, error: "Server error" }),
+      { status: 500 }
+    );
+  }
+}
+
+// PUT Method
+export async function PUT(request: Request) {
+  await dbConnect();
+  try {
+    const url = new URL(request.url);
+    const productId = url.pathname.split("/").pop();
+    const updateData = await request.json();
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      updateData,
+      { new: true }
+    );
+    return new Response(JSON.stringify({ success: true, updatedProduct }), {
+      status: 200,
+    });
+  } catch (error) {
+    console.error(error);
+    return new Response(
+      JSON.stringify({ success: false, error: "Server error" }),
+      { status: 500 }
+    );
+  }
+}

@@ -96,7 +96,7 @@ const ProductUpload = () => {
         body: formData,
       });
       const uploadData = await uploadResponse.json();
-      const imageUrl = uploadData.fileName; // Assume this is the correct property from your response
+      const imageUrl = uploadData.fileName;
 
       if (uploadResponse.ok && imageUrl) {
         const productResponse = await fetch("/api/product", {
@@ -112,23 +112,29 @@ const ProductUpload = () => {
           }),
         });
         const productData = await productResponse.json();
+
         if (productResponse.ok) {
           console.log("Product created:", productData);
           toast({
             description: `${product.name} has been successfully created.`,
           });
+
+          // Reset the form and file state to initial state
+          setProduct({ name: "", code: "", price: "" });
+          setFile(null);
+          setUploadedImagesCount(0);
         } else {
           throw new Error(productData.error || "Failed to create product");
         }
       } else {
         throw new Error(uploadData.error || "Failed to upload image");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      // toast({
-      //   description: `Error: ${error.message}`,
-      //   status: "error",
-      // });
+
+      toast({
+        description: `Error: ${error.message}`,
+      });
     } finally {
       setUploading(false);
     }
@@ -164,27 +170,27 @@ const ProductUpload = () => {
 
                 {/* Drag & Drop Text */}
                 {isDragActive ? (
-                  <p className="text-sm font-medium text-[#6C6C70]">
+                  <div className="text-sm font-medium text-[#6C6C70]">
                     Drop the file here...
-                  </p>
+                  </div>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-[#6C6C70]">
+                    <div className="text-sm font-medium text-[#6C6C70]">
                       Drag & Drop or{" "}
                       <span className="text-blue-600">Choose file</span> to
                       upload
-                    </p>
-                    <p className="text-xs text-[#6C6C70]">
+                    </div>
+                    <div className="text-xs text-[#6C6C70]">
                       JPG. or PNG Maximum file size 50MB
-                    </p>
+                    </div>
                   </>
                 )}
               </div>
             </div>
             <div className="absolute mt-2 bottom-[-20] right-2">
-              <p className="text-xs text-[#6C6C70]">
+              <div className="text-xs text-[#6C6C70]">
                 Image upload ({uploadedImagesCount}/6)
-              </p>
+              </div>
             </div>
           </div>
 

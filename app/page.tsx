@@ -66,34 +66,42 @@ export default function Home() {
       <div className="grid grid-cols-5 gap-4">
         {/* Map through your products and render cards */}
         {data.products.map((product: Product) => (
-          <div
-            key={product._id}
-            className="bg-white mt-10 shadow-custom rounded-lg w-[200px] h-[335px] flex-shrink-0 flex flex-col justify-between"
-          >
-            <Image
-              width={200}
-              height={200}
-              src={product.imageUrl}
-              alt={product.name}
-              className="rounded-t-lg w-full h-48 object-cover"
-            />
-            <div className="px-4 pt-4 flex-1">
-              <div
-                className="text-[16px] text-[#252525]"
-                style={poppins600.style}
-              >
-                {product.name}
+          <Link key={product._id} href={`/product/${product._id}`}>
+            <div
+              key={product._id}
+              className="bg-white mt-10 shadow-custom rounded-lg w-[200px] h-[335px] flex-shrink-0 flex flex-col justify-between"
+            >
+              <Image
+                width={200}
+                height={200}
+                src={product.imageUrl}
+                alt={product.name}
+                className="rounded-t-lg w-full h-48 object-cover"
+              />
+              <div className="px-4 pt-4 flex-1">
+                <div
+                  className="text-[16px] text-[#252525]"
+                  style={poppins600.style}
+                >
+                  {product.name}
+                </div>
+                <div
+                  className="text-[12px] text-[#6C6C70]"
+                  style={poppins.style}
+                >
+                  {product.code}
+                </div>
               </div>
-              <div className="text-[12px] text-[#6C6C70]" style={poppins.style}>
-                {product.code}
+              <div className="px-4 pb-4 text-right">
+                <div
+                  className="text-[20px] text-[#E13B30]"
+                  style={prompt.style}
+                >
+                  ฿{product.price}
+                </div>
               </div>
             </div>
-            <div className="px-4 pb-4 text-right">
-              <div className="text-[20px] text-[#E13B30]" style={prompt.style}>
-                ฿{product.price}
-              </div>
-            </div>
-          </div>
+          </Link>
         ))}
       </div>
       <div className="flex justify-center mt-10">
