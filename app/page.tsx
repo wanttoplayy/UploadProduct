@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
+import { useState } from "react";
+import useSWR from "swr";
 import Image from "next/image";
 import { Poppins, Prompt } from "next/font/google";
 import Link from "next/link";
@@ -44,29 +44,11 @@ async function fetcher(url: string) {
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    async function fetchProducts() {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`/api/product?search=${searchTerm}`);
-        const data = await response.json();
-        setProducts(data.products);
-      } catch (error: any) {
-        setError(error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProducts();
-  }, [searchTerm]);
+  const { data, error } = useSWR(`/api/product?search=${searchTerm}`, fetcher);
 
   if (error) return <div>Failed to load products</div>;
-  if (isLoading) return <div>Loading...</div>;
+  if (!data) return <div>Loading...</div>;
+
   return (
     <div className=" flex flex-col py-[96px] px-[99px]  bg-white ">
       <div className="text-[#252525] text-[32px] " style={poppins600.style}>
@@ -77,7 +59,7 @@ export default function Home() {
         placeholder="Search by name or code..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="rounded-full border mt-8 border-gray-300 bg-white h-14 px-5 w-full"
+        className="rounded-full border m-8 border-gray-300 bg-white h-14 px-5 w-full"
         style={{ borderColor: "#D9D9D9" }}
       />
 
