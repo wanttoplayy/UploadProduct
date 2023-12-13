@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import Image from "next/image";
 import { Poppins, Prompt } from "next/font/google";
 import Link from "next/link";
+import debounce from "lodash.debounce";
 
 import { Button } from "@/components/ui/button";
 
@@ -44,7 +45,26 @@ async function fetcher(url: string) {
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data, error } = useSWR(`/api/product?search=${searchTerm}`, fetcher);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  const { data, error } = useSWR(
+    `/api/product?search=${debouncedSearchTerm}`,
+    fetcher
+  );
+
+  const debounceSearchTerm = debounce((value) => {
+    setDebouncedSearchTerm(value);
+  }, 1500); // 500ms delay
+
+  useEffect(() => {
+    return () => {
+      debounceSearchTerm.cancel(); // Cancel the debounce on unmount
+    };
+  }, []);
+
+  const handleSearchChange = (event: any) => {
+    setSearchTerm(event.target.value);
+    debounceSearchTerm(event.target.value);
+  };
 
   if (error) return <div>Failed to load products</div>;
   if (!data) return <div>Loading...</div>;
@@ -58,7 +78,7 @@ export default function Home() {
         type="text"
         placeholder="Search by name or code..."
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={handleSearchChange}
         className="rounded-full border m-8 border-gray-300 bg-white h-14 px-5 w-full"
         style={{ borderColor: "#D9D9D9" }}
       />
