@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Product Management Application
 
-## Getting Started
+## Overview
 
-First, run the development server:
+This project is a web application for managing product information, built using Next.js 14. It allows users to create, view, edit, and delete product details. The application features a user-friendly interface for uploading product images, which are stored in AWS S3. MongoDB is used as the database to store product information.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Key Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Product Creation**: Users can create new products by providing details such as name, code, price, and an image.
+- **Image Storage**: Product images are uploaded and stored in AWS S3.
+- **Product Listing**: The home page lists all products with options to search by name or code. This page implements debounced search functionality for efficient querying.
+- **Product Detail View**: Users can view detailed information about a product and perform actions like editing or deleting.
+- **Edit and Delete**: Functionality to edit or delete products directly from the product detail page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Technologies Used
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+- **Next.js 14**: For building the server-side rendered React application.
+- **MongoDB**: As the database for storing product information.
+- **AWS S3**: For storing product images.
+- **React Dropzone**: To handle image uploads.
+- **Tailwind CSS**: For styling the application.
+- **SWR**: For data fetching, caching, and state management.
 
-## Learn More
+## Local Setup
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clone the Repository**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+git clone git@github.com:wanttoplayy/UploadProduct.git
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+2. **Install Dependencies**
 
-## Deploy on Vercel
+npm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Set up Environment Variables**
+   Create a `.env.local` file in the root directory and add the following:
+   MONGODB_URI=<your_mongodb_uri>
+   AWS_S3_BUCKET_NAME=<your_s3_bucket_name>
+   AWS_S3_REGION=<your_s3_region>
+   AWS_S3_ACCESS_KEY_ID=<your_s3_access_key_id>
+   AWS_S3_SECRET_ACCESS_KEY=<your_s3_secret_access_key>
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+4. **Run the Application**
+   npm run dev
