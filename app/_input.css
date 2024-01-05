@@ -1,0 +1,23 @@
+.mainComponent {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background-color: white;
+}
+
+@media (min-width: 1024px) {
+  .mainComponent {
+    padding: 97px;
+  }
+}
+
+.card {
+  background-color: white;
+  margin-top: 40px;
+  border-radius: 8px;
+  width: 200px;
+  height: 335px;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: space-between;
+}

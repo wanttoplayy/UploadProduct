@@ -17,7 +17,9 @@ export default async function handler(
     case "GET":
       try {
         const product = await Product.findById(id);
+
         if (!product) {
+          console.log(product);
           return res.status(404).json({ success: false });
         }
         res.status(200).json({ success: true, data: product });

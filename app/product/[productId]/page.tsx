@@ -25,6 +25,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       try {
         const response = await fetch(`/api/product/${productId}`);
         const data = await response.json();
+
         if (data.success) {
           setProduct(data.data);
         } else {
@@ -45,6 +46,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   const handleUpdate = async () => {
     try {
+      console.log(product);
       const response = await fetch(`/api/product/${productId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

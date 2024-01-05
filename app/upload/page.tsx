@@ -43,12 +43,14 @@ const ProductUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedImagesCount, setUploadedImagesCount] = useState(0);
+  const [image, setImage] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       // Assuming you want to allow a maximum of 6 images
       if (acceptedFiles.length + uploadedImagesCount <= 6) {
         setFile(acceptedFiles[0]); // If you're uploading one by one
+        setImage(URL.createObjectURL(acceptedFiles[0]));
         setUploadedImagesCount(uploadedImagesCount + acceptedFiles.length);
       } else {
         // Handle the case where the limit is exceeded
@@ -119,9 +121,10 @@ const ProductUpload = () => {
             description: `${product.name} has been successfully created.`,
           });
 
-          // Reset the form and file state to initial state
           setProduct({ name: "", code: "", price: "" });
+
           setFile(null);
+
           setUploadedImagesCount(0);
         } else {
           throw new Error(productData.error || "Failed to create product");
@@ -161,13 +164,23 @@ const ProductUpload = () => {
               <input {...getInputProps()} />
               <div className="flex flex-col items-center justify-center space-y-4">
                 {/* Image */}
-                <Image
-                  src={UploadIcon}
-                  alt="Upload icon"
-                  width={26}
-                  height={27}
-                />
-
+                {image ? (
+                  <div>
+                    <Image
+                      src={image}
+                      alt="Upload icon"
+                      width={200}
+                      height={200}
+                    />
+                  </div>
+                ) : (
+                  <Image
+                    src={UploadIcon}
+                    alt="Upload icon"
+                    width={26}
+                    height={27}
+                  />
+                )}
                 {/* Drag & Drop Text */}
                 {isDragActive ? (
                   <div className="text-sm font-medium text-[#6C6C70]">
@@ -176,7 +189,7 @@ const ProductUpload = () => {
                 ) : (
                   <>
                     <div className="text-sm font-medium text-[#6C6C70]">
-                      Drag & Drop or{" "}
+                      Drag & Drop or
                       <span className="text-blue-600">Choose file</span> to
                       upload
                     </div>
@@ -213,7 +226,6 @@ const ProductUpload = () => {
             />
           </div>
 
-          {/* Code Field */}
           <div className="flex flex-col w-[924px]">
             <label
               htmlFor="code"

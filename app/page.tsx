@@ -70,7 +70,7 @@ export default function Home() {
   if (!data) return <div>Loading...</div>;
 
   return (
-    <div className=" flex flex-col py-[96px] px-[99px]  bg-white ">
+    <div className="mainComponent">
       <div className="text-[#252525] text-[32px] " style={poppins600.style}>
         Product list
       </div>
@@ -79,24 +79,20 @@ export default function Home() {
         placeholder="Search by name or code..."
         value={searchTerm}
         onChange={handleSearchChange}
-        className="rounded-full border m-8 border-gray-300 bg-white h-14 px-5 w-full"
+        className="rounded-full border mt-8 lg:m-8 border-gray-300 bg-white h-14 px-5 w-full"
         style={{ borderColor: "#D9D9D9" }}
       />
 
-      <div className="grid grid-cols-5 gap-4">
-        {/* Map through your products and render cards */}
+      <div className="grid grid-cols-5 max-lg:grid-cols-2  gap-4">
         {data.products.map((product: Product) => (
           <Link key={product._id} href={`/product/${product._id}`}>
-            <div
-              key={product._id}
-              className="bg-white mt-10 shadow-custom rounded-lg w-[200px] h-[335px] flex-shrink-0 flex flex-col justify-between"
-            >
+            <div key={product._id} className="card shadow-xsurface">
               <Image
                 width={200}
                 height={200}
                 src={product.imageUrl}
                 alt={product.name}
-                className="rounded-t-lg w-full h-48 object-cover"
+                className="card-image"
               />
               <div className="px-4 pt-4 flex-1">
                 <div
